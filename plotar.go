@@ -16,13 +16,19 @@ import (
 	"gonum.org/v1/plot/plotutil"
 )
 
-func boxplot(title string, yLabel string, data ...interface{}) {
+func boxplot(outputFile string, title string, yLabel string, min int, max int, data ...interface{}) {
 	p, err := plot.New()
 	if err != nil {
 		panic(err)
 	}
 	p.Title.Text = title
 	p.Y.Label.Text = yLabel
+	if max > -1 {
+		p.Y.Max = float64(max)
+	}
+	if min > -1 {
+		p.Y.Min = float64(min)
+	}
 
 
 	err = plotutil.AddBoxPlots(p, vg.Points(40), data...)
@@ -31,7 +37,7 @@ func boxplot(title string, yLabel string, data ...interface{}) {
 		panic(err)
 	}
 
-	if err := p.Save(vg.Length(1+(len(data)/2))*vg.Inch, 4*vg.Inch, "boxplot.png"); err != nil {
+	if err := p.Save(vg.Length(1+(len(data)/2))*vg.Inch, 4*vg.Inch, outputFile); err != nil {
 		panic(err)
 	}
 }
@@ -72,7 +78,7 @@ func file(name string, create bool) (*os.File, error) {
 	}
 }
 
-func get_data_from_file(filename string) plotter.Values {
+func get_data_from_file(filename string, max int) plotter.Values {
 	rc, err := file(filename, false)
 	dec := vegeta.DecoderFor(rc)
 
@@ -105,9 +111,13 @@ decode:
 
 	results.Close()
 
-	data := make(plotter.Values, len(results))
-	for i,res:=range results {
-		data[i] = float64(res.Latency)/1000000
+	//data := make(plotter.Values, len(results))
+	var data []float64
+	for _,res:=range results {
+		if res.Code == 200 {
+			data = append(data, float64(res.Latency)/1000000)
+			fmt.Println("CODE: ", res.Code)
+		}
 	}
 	return data
 }
@@ -127,6 +137,9 @@ func main() {
 
 	titlePtr := flag.String("title", "SEM TITULO", "Titulo do grafico")
 	yLabelPtr := flag.String("ylabel", "SEM LABEL", "Label do Eixo Y")
+	outputPtr := flag.String("output", "boxplot.png", "Nome do arquivo de Saida")
+	maxPtr := flag.Int("max", -1, "Maximo Y")
+	minPtr := flag.Int("min", -1, "Minimo Y")
 	flag.Parse()
 
 	var data []interface{}
@@ -136,10 +149,10 @@ func main() {
 			data = append(data, arg)
 		} else {
 			fmt.Println("FILENAME: ", arg)
-			data = append(data, get_data_from_file(arg))
+			data = append(data, get_data_from_file(arg, *maxPtr))
 		}
 	}
-	boxplot(*titlePtr, *yLabelPtr, data...)
+	boxplot(*outputPtr, *titlePtr, *yLabelPtr, *minPtr, *maxPtr, data...)
 
 
 /*
