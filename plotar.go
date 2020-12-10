@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"flag"
 
-	vegeta "./vegeta/lib"
+	vegeta "github.com/tsenart/vegeta/lib"
 
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
@@ -23,15 +23,16 @@ func boxplot(outputFile string, title string, yLabel string, min int, max int, d
 	}
 	p.Title.Text = title
 	p.Y.Label.Text = yLabel
+	p.Y.Scale = plot.LogScale{}
+	p.Y.Tick.Marker = plot.LogTicks{}
+
+	err = plotutil.AddBoxPlots(p, vg.Points(40), data...)
 	if max > -1 {
 		p.Y.Max = float64(max)
 	}
 	if min > -1 {
 		p.Y.Min = float64(min)
 	}
-
-
-	err = plotutil.AddBoxPlots(p, vg.Points(40), data...)
 
 	if err != nil {
 		panic(err)
@@ -91,6 +92,7 @@ func get_data_from_file(filename string, max int) plotter.Values {
 	//rc, _ := report.(vegeta.Closer)
 
 	var results vegeta.Results
+	var metrics vegeta.Metrics
 decode:
 	for {
 		select {
@@ -105,18 +107,20 @@ decode:
 			}
 
 			results.Add(&r)
+			metrics.Add(&r)
 		}
 	}
 
 
 	results.Close()
+	metrics.Close()
 
 	//data := make(plotter.Values, len(results))
 	var data []float64
 	for _,res:=range results {
-		if res.Code == 200 {
+		if res.Code == 200 { //&& res.Latency <= metrics.Latencies.P95 && res.Latency >= metrics.Latencies.Quantile(0.05) {
 			data = append(data, float64(res.Latency)/1000000)
-			fmt.Println("CODE: ", res.Code)
+			//fmt.Println("CODE: ", res.Code)
 		}
 	}
 	return data
